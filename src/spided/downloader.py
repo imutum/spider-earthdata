@@ -43,6 +43,7 @@ class Downloader:
                 fd.write(chunk)
 
     def _stream_filesize(self, url):
+        logger.debug(f"Find Size: {url}")
         response = self.session.head(url, timeout=300)
         rsp_header = response.headers
         response.raise_for_status()
@@ -104,7 +105,7 @@ class EarthData(Downloader):
 
         # download
         with ThreadPool(threadnum) as p:
-            p.starmap(self.download_one, ((row["url"], objdir, row["size"]) for idx, row in df.iterrows()))
+            p.starmap(self.download_one, [[row["url"], objdir, row["size"]] for idx, row in df.iterrows()])
         flag_list = [
                 compare_filesize(
                     rows["name"], rows["size"], \
