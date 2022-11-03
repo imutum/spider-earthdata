@@ -6,6 +6,8 @@ from spided.info import loop_info, is_web_file_from_url
 import pandas as pd
 from multiprocessing.pool import ThreadPool
 import datetime
+import time
+import os, glob
 
 logging.basicConfig(format='%(name)s %(asctime)s %(levelname)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("Downloader")
@@ -89,16 +91,58 @@ class EarthData(Downloader):
     def download_one(self, url, objdir, filesize=None):
         super()._script_download("GET", url, objdir, filesize=filesize)
 
-    def download_from_dataframe(self, df: pd.DataFrame, objdir, threadnum=20, isDownload=True):
-        # get size url list
+    def query_size_from_dataframe(self, df: pd.DataFrame, threadnum=20, step_size=1000, temp_dir="_temp_size"):
+        """get size url list"""
+        def update_size(df_block, thread_error_num):
+            if "size" not in df_block.columns:
+                df_block["size"] = -100
+            while True:
+                df_block_error = df_block.query("size <= 0")
+                if not len(df_block_error):
+                    break
+                with ThreadPool(thread_error_num) as p:
+                    size_list = p.starmap(self._stream_filesize,
+                                          [[row["url"]] for idx, row in df_block_error.iterrows()])
+                df_block_error["size"] = size_list
+                thread_error_num = max(int(thread_error_num / 2), 1)
+                df_block.update(df_block_error)
+                time.sleep(3)
+            return df_block
+
         if "size" not in df.columns:
-            logger.info(f"DataFrame File Size Finding ......")
-            with ThreadPool(threadnum) as p:
-                size_list = p.starmap(self._stream_filesize, [[row["url"]] for idx, row in df.iterrows()])
-            df["size"] = size_list
-            ts = str(int(datetime.datetime.now().timestamp()))
-            logger.info(f"DataFrame File (With Size) Resave to {ts}.csv")
-            df.to_csv(f"{ts}.csv", encoding="utf8")
+            df["size"] = -100
+        df = df.reset_index()
+        df.index.name = "index"
+        if os.path.exists(temp_dir):
+            for _csv in glob.glob(os.path.join(temp_dir, "*.csv")):
+                _df = pd.read_csv(_csv, encoding="utf8", index_col="index")
+                df.update(_df)
+        if not len(df.query("size <= 0")):
+            return
+        logger.info(f"DataFrame File Size Finding ......")
+        if not os.path.exists(temp_dir):
+            os.mkdir(temp_dir)
+        length = len(df)
+        for idx_start in range(0, length, step_size):
+            temp_csv = os.path.join(temp_dir, f"{idx_start}_{idx_end}.csv")
+            if os.path.exists(temp_csv):
+                continue
+            idx_end = idx_start + step_size if (idx_start + step_size) <= length else length
+            df_block = update_size(df.loc[idx_start:idx_end, :], threadnum)
+            df_block.to_csv(temp_csv, encoding="utf8", index_label="index")
+            df.update(df_block)
+        ts = str(int(datetime.datetime.now().timestamp()))
+        logger.info(f"DataFrame File (With Size) Resave to {ts}.csv")
+        df.to_csv(f"{ts}.csv", encoding="utf8", index=False)
+
+    def download_from_dataframe(self,
+                                df: pd.DataFrame,
+                                objdir,
+                                threadnum=20,
+                                isDownload=True,
+                                step_size=1000,
+                                temp_dir="_temp_size"):
+        self.query_size_from_dataframe(df, threadnum=threadnum, step_size=step_size, temp_dir=temp_dir)
 
         # get file url list
         logger.info(f"DataFrame Total Length: {len(df)}")
