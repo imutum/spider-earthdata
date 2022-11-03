@@ -90,7 +90,7 @@ class EarthData(Downloader):
         if "size" not in df.columns:
             logger.info(f"DataFrame File Size Finding ......")
             with ThreadPool(threadnum) as p:
-                size_list = p.starmap(self._stream_filesize, ((row["url"]) for idx, row in df.iterrows()))
+                size_list = p.starmap(self._stream_filesize, [[row["url"]] for idx, row in df.iterrows()])
             df["size"] = size_list
             ts = str(int(datetime.datetime.now().timestamp()))
             logger.info(f"DataFrame File (With Size) Resave to {ts}.csv")
