@@ -43,11 +43,15 @@ class Downloader:
                 fd.write(chunk)
 
     def _stream_filesize(self, url):
-        logger.debug(f"Find Size: {url}")
-        response = self.session.head(url, timeout=300)
-        rsp_header = response.headers
-        response.raise_for_status()
-        return int(rsp_header.get("Content-Length", "-1"))
+        try:
+            logger.debug(f"Find Size: {url}")
+            response = self.session.head(url, timeout=300)
+            rsp_header = response.headers
+            response.raise_for_status()
+            return int(rsp_header.get("Content-Length", "-1"))
+        except Exception as e:
+            logger.error(e)
+            return -100
 
     def _script_download(self, method, url, objdir, filesize=None):
         filename = get_final_path_from_url(url)
@@ -85,7 +89,7 @@ class EarthData(Downloader):
     def download_one(self, url, objdir, filesize=None):
         super()._script_download("GET", url, objdir, filesize=filesize)
 
-    def download_from_dataframe(self, df: pd.DataFrame, objdir, threadnum=20):
+    def download_from_dataframe(self, df: pd.DataFrame, objdir, threadnum=20, isDownload=True):
         # get size url list
         if "size" not in df.columns:
             logger.info(f"DataFrame File Size Finding ......")
@@ -100,10 +104,15 @@ class EarthData(Downloader):
         logger.info(f"DataFrame Total Length: {len(df)}")
         df["isfile"] = df["url"].apply(is_web_file_from_url)
         df = df.loc[df["isfile"], :]
+        df_t = df.loc[df["size"] <= 0, :]
+        df_t.to_csv("ErrorFileSize.csv", encoding="utf8")
+        df = df.loc[df["size"] > 0, :]
         logger.info(f"DataFrame File  Length: {len(df)}")
         df["name"] = df["url"].apply(get_final_path_from_url)
 
         # download
+        if not isDownload:
+            return
         with ThreadPool(threadnum) as p:
             p.starmap(self.download_one, [[row["url"], objdir, row["size"]] for idx, row in df.iterrows()])
         flag_list = [
