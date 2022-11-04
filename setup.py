@@ -1,11 +1,30 @@
+import os, shutil, sys, glob
+
+package_name = 'spider-earthdata'
+import_name = "spided"
+
+
+def check_requires(requires: list):
+    pip_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "pip.exe")
+    for require in requires:
+        try:
+            __import__(require)
+        except:
+            os.system(f"{pip_exe} install {require}")
+
+
+# Setuptools Support
+check_requires(["setuptools"])
 import setuptools
 
-with open("README.md") as f:
-    long_description = f.read()
+# Path Support
+os.chdir(os.path.dirname(__file__))
+if os.path.isdir('build'):
+    print('INFO del dir ', 'build')
+    shutil.rmtree('build')
 
-package_name = "spided"
-
-with open(f"./src/{package_name}/__init__.py") as f:
+# Version Read
+with open(f"{import_name}/__init__.py") as f:
     for line in f.readlines():
         if line.startswith("__version__"):
             delim = '"' if '"' in line else "'"
@@ -15,20 +34,21 @@ with open(f"./src/{package_name}/__init__.py") as f:
         print("Can't find version! Stop Here!")
         exit(1)
 
+# README Doc
+with open("README.md", encoding="utf8") as f:
+    long_description = f.read()
 
+# Setup
 setuptools.setup(
-    name='spider-earthdata',  #应用名
+    name=package_name,  #应用名
     author='mondayfirst',
     author_email="",
     version=version,  #版本号
     description="This is a Package for downloading earthdata from nasa",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=setuptools.find_packages("src"),  #包括在安装包内的Python包
-    package_dir={"": "src"},
-    package_data={package_name: [
-        "*",
-    ]},
+    packages=setuptools.find_packages(import_name),  #包括在安装包内的Python包
+    zip_safe=False,
     include_package_data=True,  #启用清单文件MANIFEST.in,包含数据文件
     # exclude_package_data={'docs': ['1.txt']},  #排除文件
     install_requires=[  #自动安装依赖
