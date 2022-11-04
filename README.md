@@ -17,9 +17,11 @@ import os
 if __name__ == '__main__':
     username = ""
     passwd = ""
-    ed = EarthData(username, passwd)
-    urls = ["https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/61/MOD04_L2/2022"]
     csv_path = "r.csv"
+    urls = ["https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/61/MOD04_L2/2022"]
+
+
+    ed = EarthData(username, passwd)
     if not os.path.exists(csv_path):
         ed.loop_info(csv_path, urls, thread_num=20)
     while True:
@@ -40,8 +42,9 @@ import os
 if __name__ == '__main__':
     username = ""
     passwd = ""
-    ed = EarthData(username, passwd)
     csv_path = "r.csv"
+
+    ed = EarthData(username, passwd)
     while True:
         try:
             flag = ed.download_from_dataframe(pd.read_csv(csv_path), "./", threadnum=20)
