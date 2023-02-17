@@ -16,7 +16,7 @@ def get_final_path_from_url(url):
 
 def is_web_file_from_url(url):
     last_text = url.split("/")[-1]  # 获取URL里最后一节字符串，用于判断是文件还是目录
-    if ("." in last_text) and (re.search("(?:\.hdf)|(?:\.[a-z]{3,4})", url) is not None):  # 判断是url是否是文件夹链接
+    if ("." in last_text) and (re.search("(?:\.hdf)|(?:\.[a-z]{1,4})", url) is not None):  # 判断是url是否是文件夹链接
         return True
     else:
         return False

@@ -21,12 +21,17 @@ def _get_info_from_url(url, method=None):
         method = requests.get
     while True:
         try:
-            r = method(url + ".json")
-            _df = pd.read_json(r.text, dtype=False)
+            try:
+                _df = pd.read_csv(url + ".csv", dtype=str)
+            except Exception as e:
+                raise e
+                r = method(url + ".json")
+                _df = pd.read_json(r.text, dtype=False)
             time.sleep(1)
             break
         except Exception as e:
             _logger.error(str(e))
+            raise e
     _df.loc[:, "url"] = _df.loc[:, "name"].apply(lambda x: url + "/" + str(x))
     return _df
 
@@ -37,11 +42,11 @@ def loop_info(urls: list, thread_num=20, method=None):
     if not len(df_list):
         return pd.DataFrame()
     df = pd.concat(df_list, axis=0)
-    df_flag_isfile = df.loc[:, "name"].apply(is_web_file_from_url)
+    df_flag_isfile = df.loc[:, "url"].apply(is_web_file_from_url)
     df_file = df.loc[df_flag_isfile, :]
     df_dir = df.loc[~df_flag_isfile, :]
     if len(df_dir.loc[:, "url"]):
-        df = pd.concat([df_file, loop_info(df_dir.loc[:, "url"])], axis=0)
+        df = pd.concat([df_file, loop_info(df_dir.loc[:, "url"], thread_num, method)], axis=0)
     return df
 
 
