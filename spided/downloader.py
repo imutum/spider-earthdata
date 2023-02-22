@@ -8,6 +8,7 @@ from multiprocessing.pool import ThreadPool
 import datetime
 import time
 import os, glob
+import re
 
 logging.basicConfig(format='%(name)s %(asctime)s %(levelname)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("Downloader")
@@ -84,9 +85,24 @@ class EarthData(Downloader):
 
     def __init__(self, username, password, cookie=None) -> None:
         super().__init__()
+        self.username = username
+        self.password = password
         self.session = SessionWithHeaderRedirection(username, password, self.AUTH_HOST)
         if cookie:
             self.session.cookies = cookie
+
+    def login_web(self):
+        resp = self.session.get("https://urs.earthdata.nasa.gov/home")
+        authenticity_token = re.findall('<meta name="csrf-token" content="(.*?)" />', resp.text)[0]
+        data = {
+            "authenticity_token": authenticity_token,
+            "username": self.username,
+            "password": self.password,
+            "commit": "Log in",
+        }
+        resp = self.session.post("https://urs.earthdata.nasa.gov/login", data=data)
+        resp = self.session.get("https://urs.earthdata.nasa.gov/profile")
+        return "Country" in resp.text
 
     def download_one(self, url, objdir, filesize=None):
         super()._script_download("GET", url, objdir, filesize=filesize)
