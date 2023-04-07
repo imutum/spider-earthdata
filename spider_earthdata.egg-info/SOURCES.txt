@@ -1,9 +1,0 @@
-MANIFEST.in
-README.md
-setup.py
-spider_earthdata.egg-info/PKG-INFO
-spider_earthdata.egg-info/SOURCES.txt
-spider_earthdata.egg-info/dependency_links.txt
-spider_earthdata.egg-info/not-zip-safe
-spider_earthdata.egg-info/requires.txt
-spider_earthdata.egg-info/top_level.txt

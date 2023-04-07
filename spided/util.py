@@ -1,22 +1,25 @@
 import zipfile
-import logging
+import pandas as pd
 import os
 import re
+from .log import create_stream_logger
 
-logging.basicConfig(level=logging.ERROR,
-                    format='%(name)s %(asctime)s %(levelname)s: %(message)s',
-                    datefmt="%Y-%m-%d %H:%M:%S")
-logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
-logger.setLevel(logging.DEBUG)
+logger = create_stream_logger("Util")
 
 
 def get_final_path_from_url(url):
     return url[url.rfind('/') + 1:]
 
 
+def get_file_name_from_url(url):
+    return get_final_path_from_url(url).split("?")[0]
+
+
 def is_web_file_from_url(url):
     last_text = url.split("/")[-1]  # 获取URL里最后一节字符串，用于判断是文件还是目录
-    if ("." in last_text) and (re.search("(?:\.hdf)|(?:\.[a-z]{1,4})", url) is not None):  # 判断是url是否是文件夹链接
+    has_file_suffix = (re.search("(?:\.hdf)(?:\.tif)|(?:\.[a-z]{1,4})", last_text) is not None)
+    # 判断是url是否是文件链接
+    if ("." in last_text) and has_file_suffix:
         return True
     else:
         return False
@@ -39,27 +42,9 @@ def get_temp_dir(objfilepath, zipdirname="zipfiles"):
         return dir_path
 
 
-def compare_filesize(web_file_name: str, web_file_size: int, localdir: str = "./") -> bool:
-    """检查是否下载完成.
+def get_csv_from_url(url):
+    return pd.read_csv(url + ".csv", dtype=str)
 
-    Args:
-        web_file_name (str): 文件名称
-        web_file_size (int): 文件大小
-        localdir (str, optional): 本地路径. Defaults to "./".
 
-    Returns:
-        bool: 下载完成返回True，正在下载或下载失败或没有该文件就返回False
-    """
-
-    local_file_path = os.path.join(localdir, web_file_name)
-    if not os.path.exists(local_file_path):
-        return False
-    local_file_size = os.path.getsize(local_file_path)
-    if web_file_size != local_file_size:
-        try:
-            os.remove(local_file_path)
-        except Exception:
-            return False
-        return False
-    else:
-        return True
+def get_json_from_url(url):
+    return pd.read_json(url + ".json", dtype=False)

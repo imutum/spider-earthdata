@@ -55,6 +55,7 @@ setuptools.setup(
         "numpy",
         "pandas",
         "requests",
+        "tenacity",
     ],
     python_requires='>=3.6',
     classifiers=[
