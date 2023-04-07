@@ -1,21 +1,14 @@
-from spided import EarthData
+from spided import EarthDataDownloader, StrategyCSV
 import pandas as pd
 import os
 if __name__ == '__main__':
     username = ""
     passwd = ""
-    csv_path = "r.csv"
-    
     urls = ["https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/61/MOD04_L2/2022"]
+    obj_csv = "final.csv"
 
-    ed = EarthData(username, passwd)
-    if not os.path.exists(csv_path):
-        ed.loop_info(csv_path, urls, thread_num=20)
-    while True:
-        try:
-            flag = ed.download_from_dataframe(pd.read_csv(csv_path), "./", threadnum=20)
-            if flag:
-                print("All File Finished!")
-                break
-        except Exception as e:
-            print(e)
+    df = pd.read_csv(obj_csv) if os.path.exists(obj_csv) else pd.DataFrame.from_dict({"url": urls})
+    stra = StrategyCSV(df, local_dir="./", obj_csv=obj_csv, max_threads=10)
+    ed = EarthDataDownloader(username, passwd)
+    stra.add_downloader(ed)
+    stra.run()

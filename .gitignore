@@ -154,13 +154,6 @@ cython_debug/
 
 
 *.nc
-*.tif
-
-*.txt
-
-build
-__pycache__
-*.egg*
 *.csv
 *.hdf
 *.h5

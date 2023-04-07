@@ -6,9 +6,11 @@ if __name__ == '__main__':
     passwd = ""
     token = ""
     csv_path = "download-list.txt"
-    ed = EarthDataDownloader(username, passwd)
-    stra = StrategyCSV(pd.read_csv(csv_path), local_dir="./", obj_csv="final.csv", max_threads=10)
+    obj_csv = "final.csv"
     
-    stra.df["url"] = stra.df["url"] + "?token=" + token
+    df = pd.read_csv(obj_csv) if os.path.exists(obj_csv) else pd.read_csv(csv_path)
+    df["url"] = df["url"] + "?token=" + token
+    stra = StrategyCSV(df, local_dir="./", obj_csv=obj_csv, max_threads=10)
+    ed = EarthDataDownloader(username, passwd)
     stra.add_downloader(ed)
     stra.run()

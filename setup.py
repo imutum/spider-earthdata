@@ -1,11 +1,21 @@
 import os, shutil, sys, glob
 
-package_name = 'spider-earthdata'
-import_name = "spided"
+package_name = "spider-earthdata"
+abbreviation_name = "spided"  # 缩写
+description = ""
+version = "1.0.0"
 
 
 def check_requires(requires: list):
-    pip_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "pip.exe")
+    pip_file = "pip.exe" if "win" in sys.platform else "pip"
+    pip_paths = [
+        os.path.join(os.path.dirname(sys.executable), "Scripts", pip_file),
+        os.path.join(os.path.dirname(sys.executable), pip_file),
+    ]
+    for _path in pip_paths:
+        if os.path.exists(_path):
+            pip_exe = _path
+            break
     for require in requires:
         try:
             __import__(require)
@@ -13,7 +23,7 @@ def check_requires(requires: list):
             os.system(f"{pip_exe} install {require}")
 
 
-# Setuptools Support
+# Setiptools Support
 check_requires(["setuptools"])
 import setuptools
 
@@ -23,19 +33,8 @@ if os.path.isdir('build'):
     print('INFO del dir ', 'build')
     shutil.rmtree('build')
 
-# Version Read
-with open(f"{import_name}/__init__.py") as f:
-    for line in f.readlines():
-        if line.startswith("__version__"):
-            delim = '"' if '"' in line else "'"
-            version = line.split(delim)[1]
-            break
-    else:
-        print("Can't find version! Stop Here!")
-        exit(1)
-
 # README Doc
-with open("README.md", encoding="utf8") as f:
+with open("README.md") as f:
     long_description = f.read()
 
 # Setup
@@ -47,7 +46,8 @@ setuptools.setup(
     description="This is a Package for downloading earthdata from nasa",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=setuptools.find_packages(import_name),  #包括在安装包内的Python包
+    packages=setuptools.find_packages("src"),  #包括在安装包内的Python包
+    package_dir={"": "src"},
     zip_safe=False,
     include_package_data=True,  #启用清单文件MANIFEST.in,包含数据文件
     # exclude_package_data={'docs': ['1.txt']},  #排除文件
@@ -57,10 +57,10 @@ setuptools.setup(
         "requests",
         "tenacity",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.8',
     classifiers=[
         "Development Status :: 1 - alpha",
-        "Programming Language :: Python :: 3.6+",
+        "Programming Language :: Python :: 3.8+",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: MacOS",
