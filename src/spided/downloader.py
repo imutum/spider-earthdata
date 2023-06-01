@@ -2,7 +2,8 @@ import requests
 from .log import create_stream_logger
 from .check import check_file
 from .util import get_file_name_from_url, is_web_file_from_url, get_csv_from_url, get_json_from_url
-import re
+from requests.utils import cookiejar_from_dict
+from http.cookies import BaseCookie
 
 logger = create_stream_logger("Downloader")
 
@@ -31,6 +32,13 @@ class Downloader:
 
     def __init__(self):
         self.session = requests.Session()
+
+    def add_cookie(self, cookie):
+        if isinstance(cookie, str):
+            cookie_simplecookie_type = BaseCookie(cookie)
+            cookie_dict = {i.key: i.value for i in cookie_simplecookie_type.values()}
+            cookie = cookiejar_from_dict(cookie_dict, cookiejar=None, overwrite=True)
+        self.session.cookies.update(cookie)
 
     @check_file
     def _stream_download(self, method, url, filepath=None, chunk_size=1024 * 1024, check_method=None, fileinfo=None):
@@ -68,28 +76,3 @@ class Downloader:
             raise Exception("Can not get fileinfo from url!")
         df.loc[:, "url"] = df.loc[:, "name"].apply(lambda x: url + "/" + str(x))
         return df
-
-
-class EarthDataDownloader(Downloader):
-    AUTH_HOST = 'urs.earthdata.nasa.gov'
-
-    def __init__(self, username, password, cookie=None) -> None:
-        super().__init__()
-        self.username = username
-        self.password = password
-        self.session = SessionWithHeaderRedirection(username, password, self.AUTH_HOST)
-        if cookie:
-            self.session.cookies = cookie
-
-    def login_web(self):
-        resp = self.session.get("https://urs.earthdata.nasa.gov/home")
-        authenticity_token = re.findall('<meta name="csrf-token" content="(.*?)" />', resp.text)[0]
-        data = {
-            "authenticity_token": authenticity_token,
-            "username": self.username,
-            "password": self.password,
-            "commit": "Log in",
-        }
-        resp = self.session.post("https://urs.earthdata.nasa.gov/login", data=data)
-        resp = self.session.get("https://urs.earthdata.nasa.gov/profile")
-        return "Country" in resp.text

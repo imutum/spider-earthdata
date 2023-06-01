@@ -49,7 +49,8 @@ class StrategyCSV(StrategyTemplate):
 
     @retry(stop=stop_after_attempt(3), wait=wait_random(1, 2))
     def fetch_info(self):
-        self.df["isfile"] = self.df["url"].apply(is_web_file_from_url)
+        dir_indexes = self.df["isfile"] == False
+        self.df.loc[dir_indexes, "isfile"] = self.df.loc[dir_indexes, "url"].apply(is_web_file_from_url)
         # 迭代请求文件的文件大小
         _df = self.df.query("isfile == False")
         # 多线程执行
@@ -62,7 +63,8 @@ class StrategyCSV(StrategyTemplate):
         if not len(df_list):
             return pd.DataFrame()
         df_file = pd.concat(df_list, axis=0)
-        df_file["isfile"] = df_file["url"].apply(is_web_file_from_url)
+        dir_indexes = self.df["isfile"] == False
+        self.df.loc[dir_indexes, "isfile"] = self.df.loc[dir_indexes, "url"].apply(is_web_file_from_url)
         self.df = df_file
         if len(df_file.query("isfile == False")):
             self.fetch_info()
@@ -106,7 +108,8 @@ class StrategyCSV(StrategyTemplate):
         self.fetch_info()
         self.df.to_csv(self.obj_csv, index=False)
         # 迭代请求文件的文件大小
-        self.df["filename"] = self.df["url"].apply(get_file_name_from_url)
+        filename_indexes = self.df["filename"].str.contains(".")
+        self.df.loc[~filename_indexes, "filename"] = self.df.loc[~filename_indexes, "url"].apply(get_file_name_from_url)
         self.df["filepath"] = self.df["filename"].apply(lambda x: os.path.join(self.local_dir, x))
         self.fetch_size()
         self.df.to_csv(self.obj_csv, index=False)

@@ -158,3 +158,4 @@ cython_debug/
 *.hdf
 *.h5
 *.tif
+*.yaml

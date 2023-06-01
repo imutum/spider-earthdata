@@ -56,6 +56,7 @@ setuptools.setup(
         "pandas",
         "requests",
         "tenacity",
+        "mtmtool",
     ],
     python_requires='>=3.8',
     classifiers=[
