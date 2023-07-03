@@ -1,14 +1,13 @@
 import pandas as pd
 from .util import get_file_name_from_url, is_web_file_from_url
-from .check import compare_filesize
-from .downloader import Downloader
-from .log import create_stream_logger
+from .check import FileChecker
+from .downloader import Downloader, logger
 from tenacity import retry, stop_after_attempt, wait_random
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor
-
-logger = create_stream_logger("Download")
+from mtmtool.pool import MapPool, pooling
+from mtmtool.io import auto_make_dirs
 
 
 class StrategyTemplate:
@@ -18,7 +17,10 @@ class StrategyTemplate:
 
     def add_downloader(self, downloader: Downloader):
         self.downloader = downloader
-
+        self.stream_filesize = MapPool(self.downloader._stream_filesize, max_workers=self.max_threads, pool_type="thread")
+        self.stream_fileinfo = MapPool(self.downloader._subnode_fileinfo, max_workers=self.max_threads, pool_type="thread")
+        self.stream_download = MapPool(self.downloader._stream_download, max_workers=self.max_threads, pool_type="thread")
+        
     def run(self):
         return
 
@@ -32,6 +34,8 @@ class StrategyCSV(StrategyTemplate):
         self.pre_run(local_dir=local_dir)
         self.local_dir = local_dir
         self.obj_csv = obj_csv
+        self.config = {}
+
 
     def pre_run(self, local_dir="."):
         if "url" not in self.df.columns:
@@ -54,11 +58,11 @@ class StrategyCSV(StrategyTemplate):
         # 迭代请求文件的文件大小
         _df = self.df.query("isfile == False")
         # 多线程执行
-        with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
-            df_list = list(executor.map(
-                self.downloader._subnode_fileinfo,
-                _df["url"],
-            ))
+        for idx, row in _df.iterrows():
+            url = row["url"]
+            self.stream_fileinfo(url)
+        df_list = list(self.stream_fileinfo.result(workers=self.max_threads, pool_type="thread"))
+        # 合并结果
         df_list.append(self.df.query("isfile == True"))
         if not len(df_list):
             return pd.DataFrame()
@@ -75,11 +79,10 @@ class StrategyCSV(StrategyTemplate):
         logger.info(f"DataFrame File Size Finding ......")
         _df = self.df.query("size <= 0")
         # 多线程执行
-        with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
-            _df["size"] = list(executor.map(
-                self.downloader._stream_filesize,
-                (_df["url"]).tolist(),
-            ))
+        for url in _df["url"]:
+            self.stream_filesize(url)
+        _df["size"] = self.stream_filesize.result(workers=self.max_threads, pool_type="thread")
+        # 合并结果
         self.df.update(_df)
         failed_length = len(self.df.query("size <= 0"))
         if failed_length > 0:
@@ -89,34 +92,48 @@ class StrategyCSV(StrategyTemplate):
     def fetch_content(self):
         # 迭代下载文件
         logger.info(f"DataFrame File URL Downloading ......")
-        _df = self.df.query("size > 0")
-        with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
-            executor.map(
-                self.downloader._stream_download,
-                ["GET"] * len(_df),
-                _df["url"],
-                _df["filepath"],
-                [1024 * 1024] * len(_df),
-                ["size"] * len(_df),
-                _df["size"],
-            )
-        return self.df
+        _df = self.df.copy()
+        # 多线程执行
+        for idx, row in _df.iterrows():
+            url = row["url"]
+            dst_dir = os.path.dirname(os.path.abspath(row["filepath"]))
+            auto_make_dirs(dst_dir, isdir=True)
+            dst_filename = os.path.basename(os.path.abspath(row["filepath"]))
+            params = {
+                "method": "GET",
+                "url": url,
+                "chunk_size": 1024 * 1024,
+                "filename": dst_filename,
+                "filedir": dst_dir,
+                "filepath": os.path.join(dst_dir, dst_filename),
+                "filesize": row["size"],
+            }
+            self.stream_download(**params)
+        results = self.stream_download.result(workers=self.max_threads, pool_type="thread")
+        _df["size"] = [result["filesize"] for result in results]
+        self.df.update(_df)
+        return results
 
     # @retry(stop=stop_after_attempt(2), wait=wait_random(1, 2))
-    def run(self):
+    def run(self, isfetchinfo=True, isfetchsize=True, isfetchcontent=True):
         # 迭代请求文件的信息
-        self.fetch_info()
-        self.df.to_csv(self.obj_csv, index=False)
+        if isfetchinfo:
+            self.fetch_info()
+            self.df.to_csv(self.obj_csv, index=False)
         # 迭代请求文件的文件大小
-        filename_indexes = self.df["filename"].str.contains(".")
-        self.df.loc[~filename_indexes, "filename"] = self.df.loc[~filename_indexes, "url"].apply(get_file_name_from_url)
-        self.df["filepath"] = self.df["filename"].apply(lambda x: os.path.join(self.local_dir, x))
-        self.fetch_size()
-        self.df.to_csv(self.obj_csv, index=False)
+        if isfetchsize:
+            filename_indexes = self.df["filename"].str.contains(".")
+            self.df.loc[~filename_indexes, "filename"] = self.df.loc[~filename_indexes, "url"].apply(get_file_name_from_url)
+            self.df["filepath"] = self.df["filename"].apply(lambda x: os.path.join(self.local_dir, x))
+            self.fetch_size()
+            self.df.to_csv(self.obj_csv, index=False)
         # 迭代下载文件
-        self.fetch_content()
-        flag_list = [compare_filesize(rows["filepath"], rows["size"]) for idx, rows in self.df.iterrows()]
-        if all(flag_list):
-            logger.info("All File Finished!")
-        else:
-            raise ValueError("Some File Download Failed!")
+        if isfetchcontent:
+            self.fetch_content()
+            flag_list = [FileChecker.compare_filesize(rows["filepath"], rows["size"]) for idx, rows in self.df.iterrows()]
+            self.df.to_csv(self.obj_csv, index=False)
+            if all(flag_list):
+                logger.info("All File Finished!")
+            else:
+                raise ValueError("Some File Download Failed!")
+

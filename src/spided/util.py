@@ -2,10 +2,18 @@ import zipfile
 import pandas as pd
 import os
 import re
-from .log import create_stream_logger
+from mtmtool.log import create_stream_logger
 
 logger = create_stream_logger("Util")
 
+def get_content_length(headers):
+    return int(headers.get("Content-Length", "-1"))
+
+def get_content_filename(headers):
+    strs = headers.get("Content-Disposition", "")
+    pattern = re.compile(r'filename="(.*)"')
+    matches = pattern.findall(strs)
+    return matches[0] if matches else ""
 
 def get_final_path_from_url(url):
     return url[url.rfind('/') + 1:]
@@ -48,3 +56,27 @@ def get_csv_from_url(url):
 
 def get_json_from_url(url):
     return pd.read_json(url + ".json", dtype=False)
+
+
+
+def func_args2kwargs(func, *args, **kwargs):
+    args = list(args)
+    params = list(func.__code__.co_varnames)
+    kwargs_new_dict = {}
+
+    # Python 3.8+ only
+    try:
+        for _ in range(func.__code__.co_posonlyargcount):
+            kwargs_new_dict[params.pop(0)] = args.pop(0)
+    except Exception:
+        pass
+    # Python 3
+    for _ in range(func.__code__.co_argcount - 1):
+        kwargs_new_dict[params.pop(0)] = args.pop(0)
+
+    for _ in range(func.__code__.co_kwonlyargcount):
+        params.pop(0)
+
+    kwargs_new_dict[params.pop(0)] = tuple(args) if len(args) > 1 else args[0]
+    kwargs_new_dict.update(kwargs)
+    return kwargs_new_dict

@@ -1,99 +1,86 @@
 import os
 from functools import wraps
-from .log import create_stream_logger
+from typing import Any
+from mtmtool.log import create_stream_logger
+from collections.abc import Callable, Generator
 
-logger = create_stream_logger("Check")
-
-
-def func_args2kwargs(func, *args, **kwargs):
-    args = list(args)
-    params = list(func.__code__.co_varnames)
-    kwargs_new_dict = {}
-
-    # Python 3.8+ only
-    try:
-        for _ in range(func.__code__.co_posonlyargcount):
-            kwargs_new_dict[params.pop(0)] = args.pop(0)
-    except Exception:
-        pass
-    # Python 3
-    for _ in range(func.__code__.co_argcount - 1):
-        kwargs_new_dict[params.pop(0)] = args.pop(0)
-
-    for _ in range(func.__code__.co_kwonlyargcount):
-        params.pop(0)
-
-    kwargs_new_dict[params.pop(0)] = tuple(args) if len(args) > 1 else args[0]
-    kwargs_new_dict.update(kwargs)
-    return kwargs_new_dict
+logger = create_stream_logger("FileCheck")
 
 
-def check_file(func):
-
+def filecheck(func:Callable=None):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        nkwargs = func_args2kwargs(func, *args, **kwargs)
-        flag = check_file_auto(**nkwargs)
-        if flag:
-            return None
-        result = func(*args, **kwargs)
-        check_file_auto(**nkwargs)
-        return result
-
+        check_method = kwargs.get("check_method", "filesize")
+        if check_method == "filesize":
+            # 函数运行前检查文件大小
+            filesize = kwargs.get("filesize", -1)
+            filepath = kwargs.get("filepath", "")
+            isRemoveFailFile = kwargs.get("isRemoveFailFile", True)
+            if len(filepath) and filesize > 0:
+                is_file_equal = FileChecker.check_file_by_size(filepath, filesize, isRemoveFailFile=isRemoveFailFile)
+            else:
+                is_file_equal = False
+            # 如果文件大小不一致，才运行函数
+            if not is_file_equal:
+                result = func(*args, **kwargs)
+            else:
+                result = None
+            # 函数运行后检查文件大小
+            result_final = {}
+            if isinstance(result, dict):
+                filesize = result.get("filesize", filesize)
+                filepath = result.get("filepath", filepath)
+                is_file_equal = FileChecker.check_file_by_size(filepath, filesize)
+                result_final = result.copy()
+            result_final["is_file_equal"] = is_file_equal
+            return result_final
+        
     return wrapper
 
 
-def check_file_auto(**kwargs):
-
-    check_method = kwargs.get("check_method", None)
-    if check_method == "size":
-        return check_filesize(**kwargs)
-    if check_method == None:
-        return False
-    return
-
-
-def check_filesize(**kwargs):
-
-    # get kwargs
-    filesize = kwargs.get("fileinfo", None)
-    filepath = kwargs.get("filepath", None)
-    # check kwargs, must need filesize and filepath
-    if filesize is None:
-        raise ValueError("Must need fileinfo!")
-    if filepath is None:
-        raise ValueError("Must need filepath!")
-    # check file exist
-    if not os.path.exists(filepath):
-        return False
-    # check file size
-    flag = compare_filesize(filepath, filesize)
-    info_text = "Please Redownload!" if not flag else "Download Finished!"
-    logger.info(f"{info_text} {os.path.basename(filepath)}")
-    return flag
-
-
-def compare_filesize(filepath: str, filesize: int) -> bool:
-    """检查是否下载完成.
-
-    Args:
-        web_file_name (str): 文件名称
-        web_file_size (int): 文件大小
-        localdir (str, optional): 本地路径. Defaults to "./".
-
-    Returns:
-        bool: 下载完成返回True，正在下载或下载失败或没有该文件就返回False
-    """
-    if not os.path.exists(filepath):
-        return False
-    local_file_size = os.path.getsize(filepath)
-    if filesize != local_file_size:
-        logger.debug(f"Download Failed! Remove {filepath}")
-        try:
-            os.remove(filepath)
-        except Exception:
-            logger.debug(f"Remove {filepath} Failed!")
+class FileChecker:
+    @staticmethod
+    def check_file_by_size(filepath: str, filesize: int, isRemoveFailFile: bool=True) -> bool:
+        # check file exist
+        if not os.path.exists(filepath):
             return False
-        return False
-    else:
-        return True
+        # check file size
+        is_equal_filesize = FileChecker.compare_filesize(filepath, filesize)
+        if is_equal_filesize:
+            info_text = "File Downloaded ({:.4f}MB)!".format(filesize / 1024 / 1024)
+        else:
+            info_text = "File Redownload Please!"
+            if isRemoveFailFile:
+                # 文件大小不一致，删除文件，重新下载
+                try:
+                    os.remove(filepath)
+                except Exception:
+                    logger.error(f"Remove {filepath} Failed!")
+        logger.info(f"{info_text} {os.path.basename(filepath)}")
+        return is_equal_filesize
+
+
+    @staticmethod
+    def compare_filesize(filepath: str, filesize: int) -> bool:
+        """检查文件大小是否和给的一样
+
+        Parameters
+        ----------
+        filepath : str
+            文件路径
+        filesize : int
+            文件大小
+
+        Returns
+        -------
+        bool
+            是否相同
+        """
+        if not os.path.exists(filepath):
+            return False
+        local_file_size = os.path.getsize(filepath)
+        if filesize != local_file_size:
+            return False
+        else:
+            return True
+    

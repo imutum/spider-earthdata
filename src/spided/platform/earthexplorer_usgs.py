@@ -1,5 +1,4 @@
-from spided.downloader import Downloader, SessionWithHeaderRedirection
-from spided.downloader import logger
+from spided.downloader import Downloader, SessionWithHeaderRedirection, logger
 import requests
 import re
 import json

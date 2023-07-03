@@ -1,11 +1,15 @@
 import requests
-from .log import create_stream_logger
-from .check import check_file
-from .util import get_file_name_from_url, is_web_file_from_url, get_csv_from_url, get_json_from_url
+from mtmtool.log import create_stream_logger, logging
+from .check import filecheck
+from .util import *
 from requests.utils import cookiejar_from_dict
 from http.cookies import BaseCookie
+import time
+import threading
+import os
+import re
 
-logger = create_stream_logger("Downloader")
+logger = create_stream_logger("Down", log_level=logging.DEBUG)
 
 
 class SessionWithHeaderRedirection(requests.Session):
@@ -30,8 +34,12 @@ class SessionWithHeaderRedirection(requests.Session):
 
 class Downloader:
 
-    def __init__(self):
+    def __init__(self, config=None):
         self.session = requests.Session()
+        self.delay = 0
+        self.lock = threading.Lock()
+        self.config = config if config is not None else {}
+        # use_url_content_filename: 是否使用url中的文件名作为下载文件的文件名
 
     def add_cookie(self, cookie):
         if isinstance(cookie, str):
@@ -40,24 +48,52 @@ class Downloader:
             cookie = cookiejar_from_dict(cookie_dict, cookiejar=None, overwrite=True)
         self.session.cookies.update(cookie)
 
-    @check_file
-    def _stream_download(self, method, url, filepath=None, chunk_size=1024 * 1024, check_method=None, fileinfo=None):
-        logger.debug(f"Download Content: {get_file_name_from_url(url)}")
+
+    def get_info_from_response(self, response):
+        filename = get_content_filename(response.headers)
+        filesize = get_content_length(response.headers)
+        info_dict = {"response": response}
+        if filename:
+            info_dict["filename"] = filename
+        if filesize > 0:
+            info_dict["filesize"] = filesize
+        return info_dict
+
+    @filecheck
+    def _stream_download(self, method, url, chunk_size=1024 * 1024, **kwargs):
+        # 请求文件
         response = self.session.request(method, url, stream=True, timeout=300, allow_redirects=True)
         response.raise_for_status()
-        if filepath is None:
-            raise ValueError("filepath is None!")
-        with open(filepath, 'wb') as fd:
+        infos = self.get_info_from_response(response)
+        # 获取文件名
+        filename = infos.get("filename", get_file_name_from_url(url))
+        dst_dir = kwargs.get("filedir", "./")
+        dst_filename = kwargs.get("filename", filename)
+        if self.config.get("use_url_content_filename", False):
+            dst_filename = filename
+        dst_filepath = os.path.join(dst_dir, dst_filename)
+        infos["filepath"] = dst_filepath
+        # 下载文件
+        logger.debug(f"Downloading File: {dst_filename}")
+        with open(dst_filepath, 'wb') as fd:
             for chunk in response.iter_content(chunk_size=chunk_size):
                 fd.write(chunk)
+        # 返回结果
+        return infos
 
     def _stream_filesize(self, url):
         try:
-            logger.debug(f"Find Size: {get_file_name_from_url(url)}")
-            response = self.session.head(url, timeout=300, allow_redirects=True)
-            rsp_header = response.headers
+            if self.delay > 0 :
+                self.lock.acquire()
+                logger.debug(f"Find Size: {url}")
+                response = self.session.head(url, timeout=300, allow_redirects=True)
+                time.sleep(self.delay)
+                self.lock.release()
+            else:
+                logger.debug(f"Find Size: {url}")
+                response = self.session.head(url, timeout=300, allow_redirects=True)
             response.raise_for_status()
-            return int(rsp_header.get("Content-Length", "-1"))
+            return get_content_length(response.headers)
         except Exception as e:
             logger.error(e)
             raise e

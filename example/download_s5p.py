@@ -11,7 +11,6 @@ if __name__ == '__main__':
     max_threads = 4 # 下载时的最大线程数（同时下载的文件数）
     dst_dir = "./" # 下载文件的保存目录, 如果不存在则创建
     page_limit = 100 # 每页查询的最大数量，可以根据需要修改，如果超出最大页数（200页）则会提示报错
-    delay_seconds = 5 # 当出现429错误时，可增加等待的秒数，来避免过多的请求被拒绝
     
     # params是查询的具体参数，如果需要修改查询参数，请参考 https://s5phub.copernicus.eu/dhus/#/home，如果不包含对应的关键字则将不作为查询条件。比如，将processinglevel这一行注释掉，则在查询时将不会限制处理级别
     params = {
@@ -42,7 +41,6 @@ if __name__ == '__main__':
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
     stra = StrategyCSV(df, local_dir=dst_dir, obj_csv=obj_csv, max_threads=max_threads)
-    s5p.delay = delay_seconds
     stra.add_downloader(s5p)
-    stra.run()
+    stra.run(isfetchinfo=False, isfetchsize=False)
     pass
