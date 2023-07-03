@@ -3,7 +3,7 @@ import os, shutil, sys, glob
 package_name = "spider-earthdata"
 abbreviation_name = "spided"  # 缩写
 description = ""
-version = "1.0.2"
+version = "1.0.3"
 
 
 def check_requires(requires: list):
