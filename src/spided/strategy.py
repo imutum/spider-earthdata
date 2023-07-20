@@ -2,7 +2,6 @@ import pandas as pd
 from .util import get_file_name_from_url, is_web_file_from_url
 from .check import FileChecker
 from .downloader import Downloader, logger
-from tenacity import retry, stop_after_attempt, wait_random
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -51,7 +50,6 @@ class StrategyCSV(StrategyTemplate):
         if "isfile" not in self.df.columns:
             self.df["isfile"] = False
 
-    # @retry(stop=stop_after_attempt(3), wait=wait_random(1, 2))
     def fetch_info(self):
         dir_indexes = self.df["isfile"] == False
         self.df.loc[dir_indexes, "isfile"] = self.df.loc[dir_indexes, "url"].apply(is_web_file_from_url)
@@ -73,7 +71,6 @@ class StrategyCSV(StrategyTemplate):
         if len(df_file.query("isfile == False")):
             self.fetch_info()
 
-    # @retry(stop=stop_after_attempt(2), wait=wait_random(1, 2))
     def fetch_size(self):
         # 迭代请求文件的文件大小
         logger.info(f"DataFrame File Size Finding ......")
@@ -88,7 +85,6 @@ class StrategyCSV(StrategyTemplate):
         if failed_length > 0:
             raise ValueError(f"Some files ({failed_length}) size is not found!")
 
-    # @retry(stop=stop_after_attempt(2), wait=wait_random(1, 2))
     def fetch_content(self):
         # 迭代下载文件
         logger.info(f"DataFrame File URL Downloading ......")
@@ -114,7 +110,6 @@ class StrategyCSV(StrategyTemplate):
         self.df.update(_df)
         return results
 
-    # @retry(stop=stop_after_attempt(2), wait=wait_random(1, 2))
     def run(self, isfetchinfo=True, isfetchsize=True, isfetchcontent=True):
         # 迭代请求文件的信息
         if isfetchinfo:
