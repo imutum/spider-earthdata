@@ -1,15 +1,16 @@
-import requests
-from mtmtool.log import create_stream_logger, logging
-from .check import filecheck
-from .util import *
-from requests.utils import cookiejar_from_dict
-from http.cookies import BaseCookie
 import time
 import threading
 import os
-import re
+from http.cookies import BaseCookie
 
-logger = create_stream_logger("Down", log_level=logging.DEBUG)
+import requests
+from requests.utils import cookiejar_from_dict
+from mtmtool.log import stream_logger
+
+from .check import filecheck
+from .util import *
+
+logger = stream_logger("Down", log_level="DEBUG")
 
 
 class SessionWithHeaderRedirection(requests.Session):

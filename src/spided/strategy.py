@@ -1,12 +1,14 @@
-import pandas as pd
-from .util import get_file_name_from_url, is_web_file_from_url
-from .check import FileChecker
-from .downloader import Downloader, logger
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor
+
+import pandas as pd
 from mtmtool.pool import MapPool, pooling
-from mtmtool.io import auto_make_dirs
+from mtmtool.path import auto_make_dirs
+
+from .util import get_file_name_from_url, is_web_file_from_url
+from .check import FileChecker
+from .downloader import Downloader, logger
 
 
 class StrategyTemplate:
@@ -93,7 +95,7 @@ class StrategyCSV(StrategyTemplate):
         for idx, row in _df.iterrows():
             url = row["url"]
             dst_dir = os.path.dirname(os.path.abspath(row["filepath"]))
-            auto_make_dirs(dst_dir, isdir=True)
+            auto_make_dirs(dst_dir, is_dir=True)
             dst_filename = os.path.basename(os.path.abspath(row["filepath"]))
             params = {
                 "method": "GET",

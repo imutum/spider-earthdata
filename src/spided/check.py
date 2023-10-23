@@ -1,10 +1,12 @@
 import os
 from functools import wraps
 from typing import Any
-from mtmtool.log import create_stream_logger
 from collections.abc import Callable, Generator
 
-logger = create_stream_logger("FileCheck")
+from mtmtool.log import stream_logger
+
+
+logger = stream_logger("FileCheck")
 
 
 def filecheck(func:Callable=None):
