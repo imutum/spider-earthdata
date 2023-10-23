@@ -57,6 +57,9 @@ class StrategyCSV(StrategyTemplate):
         self.df.loc[dir_indexes, "isfile"] = self.df.loc[dir_indexes, "url"].apply(is_web_file_from_url)
         # 迭代请求文件的文件大小
         _df = self.df.query("isfile == False")
+        # 判断是否有需要查询的文件
+        if not len(_df):
+            return pd.DataFrame()
         # 多线程执行
         for idx, row in _df.iterrows():
             url = row["url"]
@@ -67,8 +70,7 @@ class StrategyCSV(StrategyTemplate):
         if not len(df_list):
             return pd.DataFrame()
         df_file = pd.concat(df_list, axis=0)
-        dir_indexes = self.df["isfile"] == False
-        self.df.loc[dir_indexes, "isfile"] = self.df.loc[dir_indexes, "url"].apply(is_web_file_from_url)
+        df_file["isfile"] = df_file["url"].apply(is_web_file_from_url)
         self.df = df_file
         if len(df_file.query("isfile == False")):
             self.fetch_info()
@@ -77,6 +79,9 @@ class StrategyCSV(StrategyTemplate):
         # 迭代请求文件的文件大小
         logger.info(f"DataFrame File Size Finding ......")
         _df = self.df.query("size <= 0")
+        # 判断是否有需要查询的文件
+        if not len(_df):
+            return
         # 多线程执行
         for url in _df["url"]:
             self.stream_filesize(url)
@@ -116,9 +121,11 @@ class StrategyCSV(StrategyTemplate):
         # 迭代请求文件的信息
         if isfetchinfo:
             self.fetch_info()
+            self.df.fillna({"size": -100, "filename": "", "filepath": ""}, inplace=True)
             self.df.to_csv(self.obj_csv, index=False)
         # 迭代请求文件的文件大小
         if isfetchsize:
+            self.df.fillna({"size": -100, "filename": "", "filepath":""}, inplace=True)
             filename_indexes = self.df["filename"].str.contains(".")
             self.df.loc[~filename_indexes, "filename"] = self.df.loc[~filename_indexes, "url"].apply(get_file_name_from_url)
             self.df["filepath"] = self.df["filename"].apply(lambda x: os.path.join(self.local_dir, x))

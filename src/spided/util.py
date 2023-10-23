@@ -2,9 +2,7 @@ import zipfile
 import pandas as pd
 import os
 import re
-from mtmtool.log import create_stream_logger
 
-logger = create_stream_logger("Util")
 
 def get_content_length(headers):
     return int(headers.get("Content-Length", "-1"))

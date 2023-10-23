@@ -4,7 +4,7 @@ import re
 import json
 from urllib.parse import quote_plus
 import time
-from mtmtool.io import yaml, Loader
+from mtmtool.io import yaml
 import pandas as pd
 from spided.util import unzip
 
@@ -49,7 +49,7 @@ class EarthExplorerDownloader(Downloader):
             self.session = requests.Session()
         if cookie:
             self.add_cookie(cookie)
-        self.session.headers.update(yaml.load(DefaultHeaders, Loader=Loader))
+        self.session.headers.update(yaml.load(DefaultHeaders, Loader=yaml.Loader))
 
     def web_login(self, username, password):
         pattern = 'name="csrf" value="(.*?)">'
