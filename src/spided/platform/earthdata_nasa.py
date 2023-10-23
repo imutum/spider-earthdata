@@ -4,13 +4,16 @@ import re
 class EarthDataDownloader(Downloader):
     AUTH_HOST = 'urs.earthdata.nasa.gov'
 
-    def __init__(self, username, password, cookie=None) -> None:
-        super().__init__()
+    def __init__(self, username, password, cookie=None, config=None) -> None:
+        if config is None:
+            config = {"delay": 1}
+        super().__init__(config=config)
         self.username = username
         self.password = password
         self.session = SessionWithHeaderRedirection(username, password, self.AUTH_HOST)
         if cookie:
             self.session.cookies = cookie
+
 
     def login_web(self):
         resp = self.session.get("https://urs.earthdata.nasa.gov/home")

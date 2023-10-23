@@ -2,6 +2,7 @@ import time
 import threading
 import os
 from http.cookies import BaseCookie
+import threading
 
 import requests
 from requests.utils import cookiejar_from_dict
@@ -10,7 +11,7 @@ from mtmtool.log import stream_logger
 from .check import filecheck
 from .util import *
 
-logger = stream_logger("Down", log_level="DEBUG")
+logger = stream_logger("Down", log_level="INFO")
 
 
 class SessionWithHeaderRedirection(requests.Session):
@@ -36,10 +37,11 @@ class SessionWithHeaderRedirection(requests.Session):
 class Downloader:
 
     def __init__(self, config=None):
-        self.session = requests.Session()
-        self.delay = 0
-        self.lock = threading.Lock()
         self.config = config if config is not None else {}
+        self.session = requests.Session()
+        self.delay = self.config.get("delay", 0)
+        self.lock = threading.Lock()
+        self.last_request_time = 0
         # use_url_content_filename: 是否使用url中的文件名作为下载文件的文件名
 
     def add_cookie(self, cookie):
@@ -62,8 +64,14 @@ class Downloader:
 
     @filecheck
     def _stream_download(self, method, url, chunk_size=1024 * 1024, **kwargs):
+        # 设置请求间隔
+        self.lock.acquire()
+        time.sleep(self.delay)
+        self.lock.release()
         # 请求文件
+        logger.debug(f"Request sended for downloading {url}")
         response = self.session.request(method, url, stream=True, timeout=300, allow_redirects=True)
+        logger.debug(f"Request accepted for downloading {url}")
         response.raise_for_status()
         infos = self.get_info_from_response(response)
         # 获取文件名
@@ -75,7 +83,7 @@ class Downloader:
         dst_filepath = os.path.join(dst_dir, dst_filename)
         infos["filepath"] = dst_filepath
         # 下载文件
-        logger.debug(f"Downloading File: {dst_filename}")
+        logger.info(f"Downloading File: {dst_filename}")
         with open(dst_filepath, 'wb') as fd:
             for chunk in response.iter_content(chunk_size=chunk_size):
                 fd.write(chunk)
@@ -86,12 +94,12 @@ class Downloader:
         try:
             if self.delay > 0 :
                 self.lock.acquire()
-                logger.debug(f"Find Size: {url}")
+                logger.info(f"Find Size: {url}")
                 response = self.session.head(url, timeout=300, allow_redirects=True)
                 time.sleep(self.delay)
                 self.lock.release()
             else:
-                logger.debug(f"Find Size: {url}")
+                logger.info(f"Find Size: {url}")
                 response = self.session.head(url, timeout=300, allow_redirects=True)
             response.raise_for_status()
             return get_content_length(response.headers)
@@ -100,7 +108,7 @@ class Downloader:
             raise e
 
     def _subnode_fileinfo(self, url):
-        logger.debug(f"Find Subnode Fileinfo {get_file_name_from_url(url)}")
+        logger.info(f"Find Subnode Fileinfo {get_file_name_from_url(url)}")
         if is_web_file_from_url(url):  # 判断是url是否是文件夹链接
             return
         for method in [get_csv_from_url, get_json_from_url]:
