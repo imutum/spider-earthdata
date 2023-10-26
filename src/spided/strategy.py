@@ -85,7 +85,7 @@ class StrategyCSV(StrategyTemplate):
         # 多线程执行
         for url in _df["url"]:
             self.stream_filesize(url)
-        _df["size"] = self.stream_filesize.result(workers=self.max_threads, pool_type="thread")
+        _df["size"] = list(self.stream_filesize.result(workers=self.max_threads, pool_type="thread"))
         # 合并结果
         self.df.update(_df)
         failed_length = len(self.df.query("size <= 0"))
