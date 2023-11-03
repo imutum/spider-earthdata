@@ -113,7 +113,7 @@ class StrategyCSV(StrategyTemplate):
             }
             self.stream_download(**params)
         results = self.stream_download.result(workers=self.max_threads, pool_type="thread")
-        _df["size"] = [result["filesize"] for result in results]
+        # _df["size"] = [result["filesize"] for result in results]
         self.df.update(_df)
         return results
 
