@@ -11,5 +11,6 @@ if __name__ == '__main__':
     stra = StrategyCSV(df, local_dir="./", obj_csv="final.csv", max_threads=10)
     ed = EarthDataDownloader(username, passwd)
     ed.delay = 1 # 设置请求间隔, 默认为1秒
+    print("登录: ", ed.login_web())
     stra.add_downloader(ed)
     stra.run()

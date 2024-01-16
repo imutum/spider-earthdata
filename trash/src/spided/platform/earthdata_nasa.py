@@ -1,4 +1,5 @@
 from spided.downloader import Downloader, SessionWithHeaderRedirection
+import requests
 import re
 
 class EarthDataDownloader(Downloader):
